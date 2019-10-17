@@ -1,1 +1,1 @@
-# GitHubCourse
+# Templates

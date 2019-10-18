@@ -1,0 +1,332 @@
+# to handle datasets
+import pandas as pd
+import numpy as np
+
+# for plotting
+import matplotlib.pyplot as plt
+% matplotlib inline
+
+# to display all the columns of the dataframe in the notebook
+pd.pandas.set_option('display.max_columns', None)
+
+
+
+# load dataset
+data = pd.read_csv('Sales or price.csv')
+
+# rows and columns of the data
+print(data.shape)
+
+# visualise the dataset
+data.head()
+
+
+# Analysing the dataset to identify:
+
+#1. Missing values
+#2. Numerical variables
+#3. Distribution of the numerical variables
+#4. Outliers
+#5. Categorical variables
+#6. Cardinality of the categorical variables
+#7. Potential relationship between the variables and the target: Sales/Price
+
+
+### Missing values
+
+# Let's go ahead and find out which variables of the dataset contain missing values
+
+
+
+# make a list of the variables that contain missing values
+vars_with_na = [var for var in data.columns if data[var].isnull().sum()>1]
+
+# print the variable name and the percentage of missing values
+for var in vars_with_na:
+    print(var, np.round(data[var].isnull().mean(), 3),  ' % missing values')
+    
+    
+#If dataset contains few variables with missing values. need to engineer the variables to use in Machine Learning Models.
+
+
+#### Relationship between values being missing and Sale Price
+
+# evaluating the price/sales for those cases where the information is missing, for each variable.
+
+def analyse_na_value(df, var):
+    df = df.copy()
+    
+    # let's make a variable that indicates 1 if the observation was missing or zero otherwise
+    df[var] = np.where(df[var].isnull(), 1, 0)
+    
+    # let's calculate the mean SalePrice where the information is missing or present
+    df.groupby(var)['SalePrice'].median().plot.bar()
+    plt.title(var)
+    plt.show()
+    
+for var in vars_with_na:
+    analyse_na_value(data, var)
+    
+# the fact that the information is missing for those variables, is important. We will capture this information when we engineer the variables
+
+
+### Numerical variables
+
+Let's go ahead and find out what numerical variables we have in the dataset
+
+# list of numerical variables
+num_vars = [var for var in data.columns if data[var].dtypes != 'O']
+
+print('Number of numerical variables: ', len(num_vars))
+
+# visualise the numerical variables
+data[num_vars].head()
+
+
+# From the above view of the dataset, we notice the variable Id,  will not use this variable to make our predictions, as there is one different value of the variable per each row
+print('Number of House Id labels: ', len(data.Id.unique()))
+print('Number of Houses in the Dataset: ', len(data))
+
+
+#### Temporal variables
+
+# For example, the difference in years between the year the product was built and the year it was sold.
+
+# list of variables that contain year information
+year_vars = [var for var in num_vars if 'Yr' in var or 'Year' in var]
+
+year_vars
+
+
+# let's explore the content of these year variables
+for var in year_vars:
+    print(var, data[var].unique())
+    print()
+    
+# explore the evolution of the sales/ price with the years in which the it was sold:
+data.groupby('YrSold')['SalePrice'].median().plot()
+plt.ylabel('Median Sales Price')
+plt.title('Change in House price with the years')
+
+
+# explore the relationship between the year variables and the sales/price in a bit of more details
+def analyse_year_vars(df, var):
+    df = df.copy()
+    
+    # capture difference between year variable and year the house was sold
+    df[var] = df['YrSold'] - df[var]
+    
+    plt.scatter(df[var], df['SalePrice'])
+    plt.ylabel('SalePrice')
+    plt.xlabel(var)
+    plt.show()
+    
+for var in year_vars:
+    if var !='YrSold':
+        analyse_year_vars(data, var)
+        
+# explore whether there is a relationship between the year variables and SalePrice. For this, we will capture the elapsed years between the Year variables and the year in which the house was sold:
+# let's explore the relationship between the year variables and the house price in a bit of more details
+def analyse_year_vars(df, var):
+    df = df.copy()
+    
+    # capture difference between year variable and year the house was sold
+    df[var] = df['YrSold'] - df[var]
+    
+    plt.scatter(df[var], df['SalePrice'])
+    plt.ylabel('SalePrice')
+    plt.xlabel(var)
+    plt.show()
+    
+for var in year_vars:
+    if var !='YrSold':
+        analyse_year_vars(data, var)
+        
+        
+        
+# there is a tendency to decrease in price
+
+#### Discrete variables
+
+# find which variables are discrete, i.e., show a finite number of values
+
+#  list of discrete variables
+discrete_vars = [var for var in num_vars if len(data[var].unique())<20 and var not in year_vars+['Id']]
+
+print('Number of discrete variables: ', len(discrete_vars))
+
+# let's visualise the discrete variables
+data[discrete_vars].head()
+
+# We can see that these variables tend to be Qualifications or grading scales, or refer to the number, or units.  analyse their contribution to the house price.
+
+def analyse_discrete(df, var):
+    df = df.copy()
+    df.groupby(var)['SalePrice'].median().plot.bar()
+    plt.title(var)
+    plt.ylabel('SalePrice')
+    plt.show()
+    
+for var in discrete_vars:
+    analyse_discrete(data, var)
+    
+# We see that there is a relationship between the variable numbers and the SalePrice, but this relationship is not always monotonic. 
+
+# For example, for OverallQual, there is a monotonic relationship: the higher the quality, the higher the SalePrice.  
+
+# However, for OverallCond, the relationship is not monotonic. Clearly, some Condition grades, like 5, favour better selling prices, but higher values do not necessarily do so. We need to be careful on how we engineer these variables to extract the most for a linear model.
+
+
+# There are ways to re-arrange the order of the discrete values of a variable, to create a monotonic relationship between the variable and the target. However, for the purpose of this course, we will not do that, to keep feature engineering simple.
+
+
+#### Continuous variables
+
+# finding the distribution of the continuous variables.  consider continuous all those that are not temporal or discrete variables in our dataset.
+
+# list of continuous variables
+cont_vars = [var for var in num_vars if var not in discrete_vars+year_vars+['Id']]
+
+print('Number of continuous variables: ', len(cont_vars))
+
+# let's visualise the continuous variables
+data[cont_vars].head()
+
+
+# Let's go ahead and analyse the distributions of these variables
+def analyse_continous(df, var):
+    df = df.copy()
+    df[var].hist(bins=20)
+    plt.ylabel('Number of houses')
+    plt.xlabel(var)
+    plt.title(var)
+    plt.show()
+    
+for var in cont_vars:
+    analyse_continous(data, var)
+    
+    
+# We see that all of the above variables, are not normally distributed, including the target variable 'SalePrice'. For linear models to perform best, we need to account for non-Gaussian distributions. We will transform variables in  feature engineering section.
+
+# evaluate here if a log transformation renders the variables more Gaussian looking:
+
+
+# Let's go ahead and analyse the distributions of these variables
+def analyse_transformed_continous(df, var):
+    df = df.copy()
+    
+    # log does not take negative values, so let's be careful and skip those variables
+    if 0 in data[var].unique():
+        pass
+    else:
+        # log transform the variable
+        df[var] = np.log(df[var])
+        df[var].hist(bins=20)
+        plt.ylabel('Number of houses')
+        plt.xlabel(var)
+        plt.title(var)
+        plt.show()
+    
+for var in cont_vars:
+    analyse_transformed_continous(data, var)
+    
+    
+# We get a better spread of values for most variables when we use the logarithmic transformation. This engineering step will most likely add performance value to our final model.
+
+# let's explore the relationship between the house price and the transformed variables
+# with more detail
+def transform_analyse_continous(df, var):
+    df = df.copy()
+    
+    # log does not take negative values, so let's be careful and skip those variables
+    if 0 in data[var].unique():
+        pass
+    else:
+        # log transform
+        df[var] = np.log(df[var])
+        df['SalePrice'] = np.log(df['SalePrice'])
+        plt.scatter(df[var], df['SalePrice'])
+        plt.ylabel('SalePrice')
+        plt.xlabel(var)
+        plt.show()
+    
+for var in cont_vars:
+    if var !='SalePrice':
+        transform_analyse_continous(data, var)
+        
+# From the previous plots, we observe some monotonic associations between SalePrice and the variables to which we applied the log transformation, for example 'Area'.
+
+
+
+#### Outliers
+# let's make boxplots to visualise outliers in the continuous variables 
+
+def find_outliers(df, var):
+    df = df.copy()
+    
+    # log does not take negative values, so let's be careful and skip those variables
+    if 0 in data[var].unique():
+        pass
+    else:
+        df[var] = np.log(df[var])
+        df.boxplot(column=var)
+        plt.title(var)
+        plt.ylabel(var)
+        plt.show()
+    
+for var in cont_vars:
+    find_outliers(data, var)
+    
+    
+    
+    
+    
+### Categorical variables
+
+#analyse the categorical variables present in the dataset.
+
+### Categorical variables
+
+cat_vars = [var for var in data.columns if data[var].dtypes=='O']
+
+print('Number of categorical variables: ', len(cat_vars))
+
+# let's visualise the values of the categorical variables
+data[cat_vars].head()
+
+
+#### Number of labels: cardinality
+
+# how many different categories are present in each of the variables.
+
+for var in cat_vars:
+    print(var, len(data[var].unique()), ' categories')
+
+    
+    
+# All the categorical variables show low cardinality, this means that they have only few different labels. That is good as we won't need to tackle cardinality during our feature engineering lecture.
+
+#### Rare labels:
+
+#investigate now if there are labels that are present only in a small number of houses:
+
+def analyse_rare_labels(df, var, rare_perc):
+    df = df.copy()
+    tmp = df.groupby(var)['SalePrice'].count() / len(df)
+    return tmp[tmp<rare_perc]
+
+for var in cat_vars:
+    print(analyse_rare_labels(data, var, 0.01))
+    print()
+    
+
+#Some of the categorical variables show multiple labels that are present in less than 1% of the houses. We will engineer these variables in our next video. Labels that are under-represented in the dataset tend to cause over-fitting of machine learning models. That is why we want to remove them.
+
+# Finally, we want to explore the relationship between the categories of the different variables and the house price:
+for var in cat_vars:
+    analyse_discrete(data, var)
+    
+    
+# Réseau, Region creche, Type crèche pd, Stock
+#data.groupby('X').count()
+#data.groupby('X')['Target'].median()
